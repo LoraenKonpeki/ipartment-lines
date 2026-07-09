@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .frames import select_crop_samples, write_crop_sample
 from .lines import LineRecord
 from .manifest import build_manifest
 from .search_db import encode_search_database
@@ -23,6 +24,13 @@ def main() -> None:
     db_parser.add_argument("--lines", required=True, help="Line records JSON path")
     db_parser.add_argument("--output", required=True, help="Output gzip database path")
 
+    crop_parser = subparsers.add_parser("sample-crops")
+    crop_parser.add_argument("--manifest", required=True, help="Manifest JSON path")
+    crop_parser.add_argument("--output-dir", required=True, help="Directory for crop images")
+    crop_parser.add_argument("--offset-ms", type=int, default=60_000, help="Offset after each segment start")
+    crop_parser.add_argument("--limit", type=int, default=None, help="Maximum samples to extract")
+    crop_parser.add_argument("--ssh-host", default=None, help="Run ffmpeg on this SSH host and scp results back")
+
     args = parser.parse_args()
     if args.command == "build-manifest":
         parts_tsv = Path(args.parts).read_text(encoding="utf-8")
@@ -41,6 +49,15 @@ def main() -> None:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(encode_search_database(records))
+    elif args.command == "sample-crops":
+        manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+        samples = select_crop_samples(manifest, offset_ms=args.offset_ms)
+        if args.limit is not None:
+            samples = samples[: args.limit]
+        output_dir = Path(args.output_dir)
+        for sample in samples:
+            output_path = write_crop_sample(sample, output_dir, ssh_host=args.ssh_host)
+            print(output_path)
 
 
 if __name__ == "__main__":

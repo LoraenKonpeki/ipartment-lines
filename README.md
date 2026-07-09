@@ -45,6 +45,20 @@ The manifest uses an editable default subtitle crop:
 
 The current source videos contain multiple episodes per file plus padding/intermission material, so generated episode boundaries are guesses. Calibrate `content_start_ms`, `content_end_ms`, and each segment before full OCR.
 
+## Sample Subtitle Crops
+
+Use this before OCR to confirm that segment boundaries and crop boxes are sensible. When videos live on `mini`, ffmpeg runs remotely and the crop images are copied back.
+
+```bash
+PYTHONPATH=src python3 -m ipartment_lines.cli sample-crops \
+  --manifest data/generated/manifest.json \
+  --output-dir data/generated/crop-samples \
+  --ssh-host mini \
+  --limit 6
+```
+
+The first sampled image in each collection may still be a title or approval screen. That is expected with the current rough manifest; later OCR filtering and manifest calibration should remove those lines.
+
 ## Build Browser Search Data
 
 After OCR produces normalized `LineRecord` objects as JSON:
