@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .frames import select_crop_samples, write_crop_sample
+from .frames import render_crop_gallery, select_crop_samples, write_crop_sample
 from .lines import LineRecord
 from .manifest import build_manifest
 from .search_db import encode_search_database
@@ -28,6 +28,12 @@ def main() -> None:
     crop_parser.add_argument("--manifest", required=True, help="Manifest JSON path")
     crop_parser.add_argument("--output-dir", required=True, help="Directory for crop images")
     crop_parser.add_argument("--offset-ms", type=int, default=60_000, help="Offset after each segment start")
+    crop_parser.add_argument(
+        "--points",
+        default=None,
+        help="Comma-separated points such as start+60s,mid,end-60s. Overrides --offset-ms.",
+    )
+    crop_parser.add_argument("--gallery", default=None, help="Optional HTML gallery output path")
     crop_parser.add_argument("--limit", type=int, default=None, help="Maximum samples to extract")
     crop_parser.add_argument("--ssh-host", default=None, help="Run ffmpeg on this SSH host and scp results back")
 
@@ -51,13 +57,18 @@ def main() -> None:
         output.write_bytes(encode_search_database(records))
     elif args.command == "sample-crops":
         manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-        samples = select_crop_samples(manifest, offset_ms=args.offset_ms)
+        points = args.points.split(",") if args.points else None
+        samples = select_crop_samples(manifest, offset_ms=args.offset_ms, points=points)
         if args.limit is not None:
             samples = samples[: args.limit]
         output_dir = Path(args.output_dir)
         for sample in samples:
             output_path = write_crop_sample(sample, output_dir, ssh_host=args.ssh_host)
             print(output_path)
+        if args.gallery:
+            gallery_path = Path(args.gallery)
+            gallery_path.parent.mkdir(parents=True, exist_ok=True)
+            gallery_path.write_text(render_crop_gallery(samples, manifest=manifest), encoding="utf-8")
 
 
 if __name__ == "__main__":

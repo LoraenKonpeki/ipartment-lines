@@ -59,6 +59,17 @@ PYTHONPATH=src python3 -m ipartment_lines.cli sample-crops \
 
 The first sampled image in each collection may still be a title or approval screen. That is expected with the current rough manifest; later OCR filtering and manifest calibration should remove those lines.
 
+For calibration, sample multiple points per candidate episode and generate an HTML gallery:
+
+```bash
+PYTHONPATH=src python3 -m ipartment_lines.cli sample-crops \
+  --manifest data/generated/manifest.json \
+  --output-dir data/generated/calibration-crops \
+  --ssh-host mini \
+  --points start+60s,mid,end-60s \
+  --gallery data/generated/calibration-crops/index.html
+```
+
 ## Build Browser Search Data
 
 After OCR produces normalized `LineRecord` objects as JSON:
