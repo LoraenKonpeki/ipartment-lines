@@ -13,3 +13,11 @@ def test_pick_recognition_region_uses_center_band():
         "h": 170,
     }
 
+
+def test_pick_recognition_region_uses_lower_wide_band_for_middle_seasons():
+    assert pick_recognition_region({"x": 360, "y": 790, "w": 1200, "h": 230}, season=2) == {
+        "x": 39,
+        "y": 79,
+        "w": 1119,
+        "h": 144,
+    }

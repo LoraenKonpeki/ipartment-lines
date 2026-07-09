@@ -18,7 +18,15 @@ def iter_sample_times(start_ms: int, end_ms: int, interval_ms: int) -> Iterable[
         current += interval_ms
 
 
-def pick_recognition_region(crop: dict[str, int]) -> dict[str, int]:
+def pick_recognition_region(crop: dict[str, int], *, season: int | None = None) -> dict[str, int]:
+    if season in (2, 3):
+        return {
+            "x": int(crop["w"] * 0.0333),
+            "y": int(crop["h"] * 0.3478),
+            "w": int(crop["w"] * 0.9333),
+            "h": int(crop["h"] * 0.6304),
+        }
+
     return {
         "x": int(crop["w"] * 0.0667),
         "y": int(crop["h"] * 0.1522),
@@ -48,7 +56,7 @@ def extract_manifest_lines(
             continue
         video_path = source["video_path"]
         crop = source["crop"]
-        rec_region = pick_recognition_region(crop)
+        rec_region = pick_recognition_region(crop, season=source.get("season"))
 
         for segment in source.get("segments", []):
             if only_segment and segment["id"] != only_segment:
