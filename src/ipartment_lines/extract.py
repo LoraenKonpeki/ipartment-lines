@@ -38,6 +38,7 @@ def extract_manifest_lines(
     only_segment: str | None = None,
     only_source: str | None = None,
     max_samples_per_segment: int | None = None,
+    ffmpeg_threads: int = 2,
 ) -> list[LineRecord]:
     records: list[LineRecord] = []
     processed_segments = 0
@@ -65,6 +66,7 @@ def extract_manifest_lines(
                 sample_interval_ms=sample_interval_ms,
                 min_confidence=min_confidence,
                 max_samples=max_samples_per_segment,
+                ffmpeg_threads=ffmpeg_threads,
             )
             records.extend(
                 merge_ocr_reads(
@@ -91,6 +93,7 @@ def _extract_segment_reads(
     sample_interval_ms: int,
     min_confidence: float,
     max_samples: int | None = None,
+    ffmpeg_threads: int = 2,
 ) -> list[OcrRead]:
     width = crop["w"]
     height = crop["h"]
@@ -101,6 +104,8 @@ def _extract_segment_reads(
         "-hide_banner",
         "-loglevel",
         "error",
+        "-threads",
+        str(ffmpeg_threads),
         "-ss",
         f"{segment['start_ms'] / 1000:.3f}",
         "-t",

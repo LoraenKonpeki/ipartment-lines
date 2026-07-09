@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--sample-interval-ms", type=int, default=2000)
     parser.add_argument("--min-confidence", type=float, default=0.75)
+    parser.add_argument("--ffmpeg-threads", type=int, default=2)
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest)
@@ -54,6 +55,8 @@ def main() -> int:
             str(args.sample_interval_ms),
             "--min-confidence",
             str(args.min_confidence),
+            "--ffmpeg-threads",
+            str(args.ffmpeg_threads),
         ]
         print(f"start page {page:02d} {source['filename']}", flush=True)
         subprocess.run(command, check=True)

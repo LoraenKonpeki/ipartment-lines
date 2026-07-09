@@ -35,6 +35,7 @@ def main() -> None:
     extract_parser.add_argument("--only-segment", default=None)
     extract_parser.add_argument("--only-source", default=None)
     extract_parser.add_argument("--max-samples-per-segment", type=int, default=None)
+    extract_parser.add_argument("--ffmpeg-threads", type=int, default=2)
 
     sql_parser = subparsers.add_parser("export-mysql-sql")
     sql_parser.add_argument("--lines", required=True, help="Line records JSON path")
@@ -85,6 +86,7 @@ def main() -> None:
             only_segment=args.only_segment,
             only_source=args.only_source,
             max_samples_per_segment=args.max_samples_per_segment,
+            ffmpeg_threads=args.ffmpeg_threads,
         )
     elif args.command == "export-mysql-sql":
         raw_records = json.loads(Path(args.lines).read_text(encoding="utf-8"))
