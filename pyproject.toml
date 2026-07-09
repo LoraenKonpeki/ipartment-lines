@@ -14,7 +14,7 @@ ipartment-lines = "ipartment_lines.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-ocr = ["pillow>=10", "paddleocr>=2.7"]
+ocr = ["numpy>=1.26", "rapidocr_onnxruntime>=1.3", "opencv-python-headless>=4.9"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

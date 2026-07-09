@@ -4,9 +4,11 @@ import argparse
 import json
 from pathlib import Path
 
+from .extract import build_rapidocr_recognizer, extract_manifest_lines, load_manifest
 from .frames import render_crop_gallery, select_crop_samples, write_crop_sample
 from .lines import LineRecord
 from .manifest import build_manifest
+from .mysql_export import render_mysql_sql
 from .search_db import encode_search_database
 
 
@@ -23,6 +25,20 @@ def main() -> None:
     db_parser = subparsers.add_parser("build-db")
     db_parser.add_argument("--lines", required=True, help="Line records JSON path")
     db_parser.add_argument("--output", required=True, help="Output gzip database path")
+
+    extract_parser = subparsers.add_parser("extract-lines")
+    extract_parser.add_argument("--manifest", required=True, help="Manifest JSON path")
+    extract_parser.add_argument("--output", required=True, help="Output line records JSON path")
+    extract_parser.add_argument("--sample-interval-ms", type=int, default=1000)
+    extract_parser.add_argument("--min-confidence", type=float, default=0.75)
+    extract_parser.add_argument("--limit-segments", type=int, default=None)
+    extract_parser.add_argument("--only-segment", default=None)
+    extract_parser.add_argument("--max-samples-per-segment", type=int, default=None)
+
+    sql_parser = subparsers.add_parser("export-mysql-sql")
+    sql_parser.add_argument("--lines", required=True, help="Line records JSON path")
+    sql_parser.add_argument("--output", required=True, help="Output SQL path")
+    sql_parser.add_argument("--database", default="ipartment_lines")
 
     crop_parser = subparsers.add_parser("sample-crops")
     crop_parser.add_argument("--manifest", required=True, help="Manifest JSON path")
@@ -55,6 +71,25 @@ def main() -> None:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(encode_search_database(records))
+    elif args.command == "extract-lines":
+        manifest = load_manifest(Path(args.manifest))
+        ocr = build_rapidocr_recognizer()
+        extract_manifest_lines(
+            manifest,
+            output_path=Path(args.output),
+            ocr=ocr,
+            sample_interval_ms=args.sample_interval_ms,
+            min_confidence=args.min_confidence,
+            limit_segments=args.limit_segments,
+            only_segment=args.only_segment,
+            max_samples_per_segment=args.max_samples_per_segment,
+        )
+    elif args.command == "export-mysql-sql":
+        raw_records = json.loads(Path(args.lines).read_text(encoding="utf-8"))
+        records = [LineRecord(**record) for record in raw_records]
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(render_mysql_sql(records, database=args.database), encoding="utf-8")
     elif args.command == "sample-crops":
         manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
         points = args.points.split(",") if args.points else None
