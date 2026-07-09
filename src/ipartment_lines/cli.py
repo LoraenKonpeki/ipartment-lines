@@ -33,6 +33,7 @@ def main() -> None:
     extract_parser.add_argument("--min-confidence", type=float, default=0.75)
     extract_parser.add_argument("--limit-segments", type=int, default=None)
     extract_parser.add_argument("--only-segment", default=None)
+    extract_parser.add_argument("--only-source", default=None)
     extract_parser.add_argument("--max-samples-per-segment", type=int, default=None)
 
     sql_parser = subparsers.add_parser("export-mysql-sql")
@@ -82,6 +83,7 @@ def main() -> None:
             min_confidence=args.min_confidence,
             limit_segments=args.limit_segments,
             only_segment=args.only_segment,
+            only_source=args.only_source,
             max_samples_per_segment=args.max_samples_per_segment,
         )
     elif args.command == "export-mysql-sql":

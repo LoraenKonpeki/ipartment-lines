@@ -36,12 +36,15 @@ def extract_manifest_lines(
     min_confidence: float = 0.75,
     limit_segments: int | None = None,
     only_segment: str | None = None,
+    only_source: str | None = None,
     max_samples_per_segment: int | None = None,
 ) -> list[LineRecord]:
     records: list[LineRecord] = []
     processed_segments = 0
 
     for source in manifest.get("sources", []):
+        if only_source and source["filename"] != only_source:
+            continue
         video_path = source["video_path"]
         crop = source["crop"]
         rec_region = pick_recognition_region(crop)
@@ -116,10 +119,12 @@ def _extract_segment_reads(
     reads: list[OcrRead] = []
     process = subprocess.Popen(command, stdout=subprocess.PIPE)
     assert process.stdout is not None
+    stopped_early = False
 
     try:
         for index, time_ms in enumerate(iter_sample_times(segment["start_ms"], segment["end_ms"], sample_interval_ms)):
             if max_samples is not None and index >= max_samples:
+                stopped_early = True
                 break
             raw = process.stdout.read(frame_size)
             if len(raw) < frame_size:
@@ -141,9 +146,11 @@ def _extract_segment_reads(
                     )
                 )
     finally:
+        if stopped_early:
+            process.terminate()
         process.stdout.close()
         process.wait()
-        if process.returncode not in (0, None):
+        if process.returncode not in (0, None) and not stopped_early:
             raise RuntimeError(f"ffmpeg failed for {segment['id']} with exit code {process.returncode}")
 
     return reads
