@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ipartment-lines"
+version = "0.1.0"
+description = "Local tooling for building a searchable line index from hard-subtitled videos."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+ipartment-lines = "ipartment_lines.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+ocr = ["pillow>=10", "paddleocr>=2.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

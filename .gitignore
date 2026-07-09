@@ -1,0 +1,19 @@
+.DS_Store
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+*.egg-info/
+
+# Local media and generated artifacts. Do not commit copyrighted material.
+data/raw/
+data/generated/
+data/work/
+screenshots/
+frames/
+*.mp4
+*.mkv
+*.avi
+*.mov
+
