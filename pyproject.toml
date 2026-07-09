@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ipartment-lines"
 version = "0.1.0"
 description = "Local tooling for building a searchable line index from hard-subtitled videos."
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = []
 
 [project.scripts]
