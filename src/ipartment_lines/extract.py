@@ -193,9 +193,12 @@ def _extract_segment_reads_exact_seek(
     frame_size = width * height * 3
     reads: list[OcrRead] = []
 
+    segment_id = str(segment.get("id", "segment"))
     for index, time_ms in enumerate(iter_sample_times(segment["start_ms"], segment["end_ms"], sample_interval_ms)):
         if max_samples is not None and index >= max_samples:
             break
+        if index > 0 and index % 50 == 0:
+            print(f"{segment_id}: sampled {index} at {time_ms}", flush=True)
         command = build_exact_seek_command(
             video_path=video_path,
             crop=crop,
