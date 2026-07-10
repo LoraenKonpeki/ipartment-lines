@@ -10,6 +10,7 @@ from .lines import LineRecord
 from .manifest import build_manifest
 from .mysql_export import render_mysql_sql
 from .search_db import encode_search_database
+from .screenshots import build_screenshot_jobs, generate_screenshots, load_line_records
 
 
 def main() -> None:
@@ -54,6 +55,15 @@ def main() -> None:
     crop_parser.add_argument("--gallery", default=None, help="Optional HTML gallery output path")
     crop_parser.add_argument("--limit", type=int, default=None, help="Maximum samples to extract")
     crop_parser.add_argument("--ssh-host", default=None, help="Run ffmpeg on this SSH host and scp results back")
+
+    screenshots_parser = subparsers.add_parser("generate-screenshots")
+    screenshots_parser.add_argument("--lines", required=True, help="Line records JSON path")
+    screenshots_parser.add_argument("--video-root", required=True, help="Directory containing source videos")
+    screenshots_parser.add_argument("--output-dir", required=True, help="Output screenshot directory")
+    screenshots_parser.add_argument("--width", type=int, default=1280)
+    screenshots_parser.add_argument("--quality", type=int, default=80)
+    screenshots_parser.add_argument("--workers", type=int, default=2)
+    screenshots_parser.add_argument("--limit", type=int, default=None, help="Maximum pending screenshots to generate")
 
     args = parser.parse_args()
     if args.command == "build-manifest":
@@ -108,6 +118,22 @@ def main() -> None:
             gallery_path = Path(args.gallery)
             gallery_path.parent.mkdir(parents=True, exist_ok=True)
             gallery_path.write_text(render_crop_gallery(samples, manifest=manifest), encoding="utf-8")
+    elif args.command == "generate-screenshots":
+        records = load_line_records(Path(args.lines))
+        jobs = build_screenshot_jobs(
+            records,
+            video_root=Path(args.video_root),
+            output_root=Path(args.output_dir),
+        )
+        if args.limit is not None:
+            jobs = jobs[: args.limit]
+        generated, total = generate_screenshots(
+            jobs,
+            width=args.width,
+            quality=args.quality,
+            workers=args.workers,
+        )
+        print(f"generated {generated}/{total}")
 
 
 if __name__ == "__main__":
