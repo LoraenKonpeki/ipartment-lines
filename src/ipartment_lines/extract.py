@@ -47,6 +47,8 @@ def extract_manifest_lines(
     only_source: str | None = None,
     max_samples_per_segment: int | None = None,
     ffmpeg_threads: int = 2,
+    sample_frame_rate: float = 24.0,
+    sampling_mode: str = "exact-seek",
 ) -> list[LineRecord]:
     records: list[LineRecord] = []
     processed_segments = 0
@@ -65,17 +67,33 @@ def extract_manifest_lines(
                 _write_records(output_path, records)
                 return records
 
-            reads = _extract_segment_reads(
-                video_path=video_path,
-                crop=crop,
-                rec_region=rec_region,
-                segment=segment,
-                ocr=ocr,
-                sample_interval_ms=sample_interval_ms,
-                min_confidence=min_confidence,
-                max_samples=max_samples_per_segment,
-                ffmpeg_threads=ffmpeg_threads,
-            )
+            if sampling_mode == "exact-seek":
+                reads = _extract_segment_reads_exact_seek(
+                    video_path=video_path,
+                    crop=crop,
+                    rec_region=rec_region,
+                    segment=segment,
+                    ocr=ocr,
+                    sample_interval_ms=sample_interval_ms,
+                    min_confidence=min_confidence,
+                    max_samples=max_samples_per_segment,
+                    ffmpeg_threads=ffmpeg_threads,
+                )
+            elif sampling_mode == "frame-select":
+                reads = _extract_segment_reads(
+                    video_path=video_path,
+                    crop=crop,
+                    rec_region=rec_region,
+                    segment=segment,
+                    ocr=ocr,
+                    sample_interval_ms=sample_interval_ms,
+                    min_confidence=min_confidence,
+                    max_samples=max_samples_per_segment,
+                    ffmpeg_threads=ffmpeg_threads,
+                    sample_frame_rate=sample_frame_rate,
+                )
+            else:
+                raise ValueError(f"unsupported sampling_mode: {sampling_mode}")
             records.extend(
                 merge_ocr_reads(
                     season=segment["season"],
@@ -102,32 +120,21 @@ def _extract_segment_reads(
     min_confidence: float,
     max_samples: int | None = None,
     ffmpeg_threads: int = 2,
+    sample_frame_rate: float = 24.0,
 ) -> list[OcrRead]:
     width = crop["w"]
     height = crop["h"]
-    duration = (segment["end_ms"] - segment["start_ms"]) / 1000
-    fps = 1000 / sample_interval_ms
-    command = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-threads",
-        str(ffmpeg_threads),
-        "-ss",
-        f"{segment['start_ms'] / 1000:.3f}",
-        "-t",
-        f"{duration:.3f}",
-        "-i",
-        video_path,
-        "-vf",
-        f"fps={fps:.6f},crop={width}:{height}:{crop['x']}:{crop['y']}",
-        "-pix_fmt",
-        "bgr24",
-        "-f",
-        "rawvideo",
-        "pipe:1",
-    ]
+    command = build_extract_command(
+        video_path=video_path,
+        crop=crop,
+        start_ms=segment["start_ms"],
+        end_ms=segment["end_ms"],
+        sample_interval_ms=sample_interval_ms,
+        sample_frame_rate=sample_frame_rate,
+        ffmpeg_threads=ffmpeg_threads,
+    )
+    if max_samples is not None:
+        command[-1:-1] = ["-frames:v", str(max_samples)]
     frame_size = width * height * 3
     reads: list[OcrRead] = []
     process = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -167,6 +174,126 @@ def _extract_segment_reads(
             raise RuntimeError(f"ffmpeg failed for {segment['id']} with exit code {process.returncode}")
 
     return reads
+
+
+def _extract_segment_reads_exact_seek(
+    *,
+    video_path: str,
+    crop: dict[str, int],
+    rec_region: dict[str, int],
+    segment: dict,
+    ocr: OcrFunction,
+    sample_interval_ms: int,
+    min_confidence: float,
+    max_samples: int | None = None,
+    ffmpeg_threads: int = 1,
+) -> list[OcrRead]:
+    width = crop["w"]
+    height = crop["h"]
+    frame_size = width * height * 3
+    reads: list[OcrRead] = []
+
+    for index, time_ms in enumerate(iter_sample_times(segment["start_ms"], segment["end_ms"], sample_interval_ms)):
+        if max_samples is not None and index >= max_samples:
+            break
+        command = build_exact_seek_command(
+            video_path=video_path,
+            crop=crop,
+            time_ms=time_ms,
+            ffmpeg_threads=ffmpeg_threads,
+        )
+        raw = subprocess.check_output(command)
+        if len(raw) < frame_size:
+            continue
+
+        import numpy as np
+
+        frame = np.frombuffer(raw, dtype=np.uint8).reshape((height, width, 3))
+        region = frame[
+            rec_region["y"] : rec_region["y"] + rec_region["h"],
+            rec_region["x"] : rec_region["x"] + rec_region["w"],
+        ]
+        text, confidence = ocr(region)
+        if text and confidence >= min_confidence:
+            reads.append(
+                OcrRead(
+                    time_ms=time_ms,
+                    text=text,
+                    screenshot_key=f"{segment['id']}/{time_ms:09d}.webp",
+                )
+            )
+
+    return reads
+
+
+def build_exact_seek_command(
+    *,
+    video_path: str,
+    crop: dict[str, int],
+    time_ms: int,
+    ffmpeg_threads: int = 1,
+) -> list[str]:
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-threads",
+        str(ffmpeg_threads),
+        "-ss",
+        f"{time_ms / 1000:.3f}",
+        "-i",
+        video_path,
+        "-frames:v",
+        "1",
+        "-vf",
+        f"crop={crop['w']}:{crop['h']}:{crop['x']}:{crop['y']}",
+        "-pix_fmt",
+        "bgr24",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+    ]
+
+
+def build_extract_command(
+    *,
+    video_path: str,
+    crop: dict[str, int],
+    start_ms: int,
+    end_ms: int,
+    sample_interval_ms: int,
+    sample_frame_rate: float = 24.0,
+    ffmpeg_threads: int = 2,
+) -> list[str]:
+    duration = (end_ms - start_ms) / 1000
+    frame_step = max(1, round(sample_frame_rate * sample_interval_ms / 1000))
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-threads",
+        str(ffmpeg_threads),
+        "-ss",
+        f"{start_ms / 1000:.3f}",
+        "-t",
+        f"{duration:.3f}",
+        "-i",
+        video_path,
+        "-vf",
+        (
+            f"select=not(mod(n\\,{frame_step})),"
+            f"crop={crop['w']}:{crop['h']}:{crop['x']}:{crop['y']}"
+        ),
+        "-vsync",
+        "0",
+        "-pix_fmt",
+        "bgr24",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+    ]
 
 
 def build_rapidocr_recognizer() -> OcrFunction:
