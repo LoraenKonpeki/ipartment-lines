@@ -40,6 +40,23 @@ def pending_jobs(jobs: list[ScreenshotJob]) -> list[ScreenshotJob]:
     return [job for job in jobs if not (job.output_path.exists() and job.output_path.stat().st_size > 0)]
 
 
+def prepare_fresh_output_dir(output_dir: Path, *, archive_tag: str) -> Path | None:
+    """Archive a populated output directory and recreate it for a full rebuild."""
+    if output_dir.exists():
+        if not output_dir.is_dir():
+            raise ValueError(f"screenshot output path is not a directory: {output_dir}")
+        if any(output_dir.iterdir()):
+            archive_path = output_dir.with_name(f"{output_dir.name}.{archive_tag}")
+            if archive_path.exists():
+                raise FileExistsError(f"screenshot archive already exists: {archive_path}")
+            output_dir.replace(archive_path)
+            output_dir.mkdir(parents=True)
+            return archive_path
+    else:
+        output_dir.mkdir(parents=True)
+    return None
+
+
 def build_ffmpeg_command(
     job: ScreenshotJob,
     *,

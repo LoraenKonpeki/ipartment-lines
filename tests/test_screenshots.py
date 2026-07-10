@@ -2,6 +2,7 @@ from pathlib import Path
 
 from ipartment_lines.screenshots import (
     ScreenshotJob,
+    prepare_fresh_output_dir,
     build_ffmpeg_command,
     build_screenshot_jobs,
     pending_jobs,
@@ -42,6 +43,20 @@ def test_pending_jobs_skips_existing_nonempty_outputs(tmp_path):
     ]
 
     assert list(pending_jobs(jobs)) == [jobs[1]]
+
+
+def test_prepare_fresh_output_dir_archives_existing_screenshots(tmp_path):
+    output_dir = tmp_path / "screenshots_1280"
+    existing = output_dir / "S01E01" / "007210000.webp"
+    existing.parent.mkdir(parents=True)
+    existing.write_bytes(b"old-image")
+
+    archive = prepare_fresh_output_dir(output_dir, archive_tag="before-exact-123")
+
+    assert archive == tmp_path / "screenshots_1280.before-exact-123"
+    assert (archive / "S01E01" / "007210000.webp").read_bytes() == b"old-image"
+    assert output_dir.is_dir()
+    assert not any(output_dir.iterdir())
 
 
 def test_build_ffmpeg_command_scales_to_width_and_webp_quality(tmp_path):

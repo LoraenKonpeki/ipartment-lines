@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+from ipartment_lines.screenshots import prepare_fresh_output_dir
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -40,7 +42,13 @@ def main() -> int:
     print(f"published {final_lines} to {target_lines}", flush=True)
 
     screenshot_dir = plugin_data_dir / "screenshots_1280"
-    screenshot_dir.mkdir(parents=True, exist_ok=True)
+    screenshot_archive = prepare_fresh_output_dir(
+        screenshot_dir,
+        archive_tag=f"before-exact-{int(time.time())}",
+    )
+    if screenshot_archive is not None:
+        print(f"archived previous screenshots to {screenshot_archive}", flush=True)
+
     command = [
         sys.executable,
         "-m",
